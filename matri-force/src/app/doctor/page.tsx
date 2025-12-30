@@ -245,13 +245,14 @@ export default function DoctorConsole() {
                 
                 {/* SOS Alerts */}
 {sosAlerts.map(alert => (
-  <div key={alert.id} onClick={()=>{
-      // Safety check: ensure lat/lng exist before setting map center
-      const safeLat = alert.lat || 0;
-      const safeLng = alert.lng || 0;
-      setSelectedPatient({...alert, type: 'SOS'}); 
-      setMapCenter([safeLat, safeLng])
-    }} 
+  <div key={alert.id} onClick={() => {
+  // Use 0,0 if location is missing so the map doesn't crash
+  const safeLat = alert.lat || 0;
+  const safeLng = alert.lng || 0;
+  
+  setSelectedPatient({...alert, type: 'SOS'}); 
+  setMapCenter([safeLat, safeLng]);
+}}
     className={`p-3 rounded-xl border cursor-pointer ${selectedPatient?.id===alert.id ? 'bg-rose-950/40 border-rose-500' : 'bg-slate-800 border-slate-700 hover:border-slate-500'}`}>
     
     <div className="flex justify-between mb-1">
@@ -302,7 +303,9 @@ export default function DoctorConsole() {
                     <Popup><b className="text-slate-900">{d.name}</b><br/><span className="text-slate-700">{d.status}</span></Popup>
                   </CircleMarker>
                 ))}
-                {sosAlerts.map(p => (
+                {sosAlerts
+                .filter(p => p.lat && p.lng)
+                .map(p => (
                   <CircleMarker key={p.id} center={[p.lat, p.lng]} pathOptions={{ color: '#ef4444', fillColor: '#ef4444', fillOpacity: 1 }} radius={10}>
                     <Popup><b className="text-red-600">SOS ACTIVE</b><br/>{p.user_name}</Popup>
                   </CircleMarker>
