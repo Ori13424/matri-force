@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { 
   Navigation, Bell, MapPin, CheckCircle, Power, 
-  User, DollarSign, History, Phone, Car, ArrowRight
+  User, DollarSign, History, Phone, Car, ArrowRight, UserPlus
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -12,11 +12,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { db, rtdb, auth } from "@/lib/firebase";
 import { 
   signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword,
+  updateProfile,
   onAuthStateChanged,
   signOut 
 } from "firebase/auth";
-import { ref, onValue, update } from "firebase/database";
-import { doc, getDoc, collection, addDoc } from "firebase/firestore";
+import { ref, onValue, update, set } from "firebase/database";
+import { doc, getDoc, collection, addDoc, setDoc } from "firebase/firestore";
 
 // CSS for Map
 import "leaflet/dist/leaflet.css";
@@ -59,11 +61,16 @@ export default function DriverApp() {
         // Verify Role is 'driver'
         const docRef = doc(db, "users", u.uid);
         const docSnap = await getDoc(docRef);
+        
+        // Allow access if role is driver OR if it's a new account (doc might be creating)
         if (docSnap.exists() && docSnap.data().role === 'driver') {
           setUser(u);
           // Check previous online status
           const statusRef = ref(rtdb, `drivers/${u.uid}/status`);
           onValue(statusRef, (s) => setIsOnline(s.val() !== 'offline'), { onlyOnce: true });
+        } else if (!docSnap.exists()) {
+           // Fallback for brand new signups to prevent lockout before DB write completes
+           setUser(u);
         } else {
           await signOut(auth);
           alert("Access Denied: Registered Drivers Only.");
@@ -242,7 +249,7 @@ export default function DriverApp() {
 
       {/* --- INTERFACE LAYER --- */}
       <div className="mt-auto z-10 p-4 pb-8 w-full pointer-events-none">
-        <div className="pointer-events-auto"> {/* Enable clicking inside this div */}
+        <div className="pointer-events-auto">
         <AnimatePresence mode="wait">
           
           {/* 1. IDLE STATE */}
@@ -341,16 +348,43 @@ export default function DriverApp() {
   );
 }
 
-// --- AUTH SCREEN ---
+// --- AUTH SCREEN (UPDATED) ---
 function AuthScreen() {
+  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
+  const [name, setName] = useState("");
   const [error, setError] = useState("");
 
-  const handleLogin = (e: any) => {
+  const handleAuth = async (e: any) => {
     e.preventDefault();
-    signInWithEmailAndPassword(auth, email, pass).catch(err => setError(err.message));
-  }
+    setError("");
+    try {
+      if(isLogin) {
+        await signInWithEmailAndPassword(auth, email, pass);
+      } else {
+        // REGISTER DRIVER & AUTOMATE DB POPULATION
+        const res = await createUserWithEmailAndPassword(auth, email, pass);
+        await updateProfile(res.user, { displayName: name });
+        
+        // 1. Create Firestore Profile (Secure Role)
+        await setDoc(doc(db, "users", res.user.uid), {
+          name, email, role: 'driver', createdAt: new Date().toISOString()
+        });
+
+        // 2. Initialize Realtime DB (Map Presence)
+        await set(ref(rtdb, `drivers/${res.user.uid}`), {
+          name, 
+          status: 'offline', // Default offline
+          type: 'Ambulance',
+          lat: 23.8103, // Default Coords (Dhaka)
+          lng: 90.4125
+        });
+      }
+    } catch (e:any) { 
+      setError(e.message.replace("Firebase: ", ""));
+    }
+  };
 
   return (
     <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 text-white">
@@ -359,24 +393,34 @@ function AuthScreen() {
             <div className="bg-yellow-500 p-4 rounded-2xl text-black shadow-lg shadow-yellow-500/20"><Car size={48}/></div>
          </div>
          <h1 className="text-3xl font-black text-center mb-2 tracking-tighter">MATRI-FLEET</h1>
-         <p className="text-gray-500 text-center mb-8 text-sm">Secure Login for Emergency Response Units</p>
+         <p className="text-gray-500 text-center mb-8 text-sm">{isLogin ? "Driver Secure Login" : "Join the Rescue Fleet"}</p>
          
-         <form onSubmit={handleLogin} className="space-y-4">
+         <form onSubmit={handleAuth} className="space-y-4">
+            {!isLogin && (
+              <div className="bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-4 flex items-center gap-3 focus-within:border-yellow-500 transition-colors">
+                 <UserPlus className="text-gray-500" size={20}/>
+                 <input className="bg-transparent flex-1 outline-none text-white placeholder-gray-600 text-sm" placeholder="Full Name" value={name} onChange={e=>setName(e.target.value)} required/>
+              </div>
+            )}
             <div className="bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-4 flex items-center gap-3 focus-within:border-yellow-500 transition-colors">
                <User className="text-gray-500" size={20}/>
-               <input className="bg-transparent flex-1 outline-none text-white placeholder-gray-600 text-sm" placeholder="Driver Email" value={email} onChange={e=>setEmail(e.target.value)}/>
+               <input className="bg-transparent flex-1 outline-none text-white placeholder-gray-600 text-sm" placeholder="Driver Email" value={email} onChange={e=>setEmail(e.target.value)} required/>
             </div>
             <div className="bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-4 flex items-center gap-3 focus-within:border-yellow-500 transition-colors">
                <div className="text-gray-500"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
-               <input className="bg-transparent flex-1 outline-none text-white placeholder-gray-600 text-sm" type="password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)}/>
+               <input className="bg-transparent flex-1 outline-none text-white placeholder-gray-600 text-sm" type="password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)} required/>
             </div>
             
             {error && <p className="text-red-500 text-xs text-center font-bold bg-red-900/20 py-2 rounded">{error}</p>}
 
             <button className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold py-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 mt-4">
-               LOGIN TO CONSOLE <ArrowRight size={20}/>
+               {isLogin ? "LOGIN TO CONSOLE" : "REGISTER UNIT"} <ArrowRight size={20}/>
             </button>
          </form>
+
+         <button onClick={()=>setIsLogin(!isLogin)} className="w-full text-center text-xs text-gray-500 mt-6 hover:text-white">
+            {isLogin ? "New Driver? Apply for Access" : "Already registered? Login Here"}
+         </button>
        </div>
     </div>
   );

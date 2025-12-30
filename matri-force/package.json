@@ -13,6 +13,7 @@
     "clsx": "^2.1.1",
     "firebase": "^12.7.0",
     "framer-motion": "^12.23.26",
+    "groq-sdk": "^0.37.0",
     "leaflet": "^1.9.4",
     "leaflet-defaulticon-compatibility": "^0.1.2",
     "leaflet-geosearch": "^4.2.2",
