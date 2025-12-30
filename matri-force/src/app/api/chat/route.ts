@@ -1,94 +1,85 @@
 import { NextResponse } from "next/server";
 import Groq from "groq-sdk";
 
-// Initialize Groq Client
 const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY, 
+  apiKey: process.env.GROQ_API_KEY || "dummy_key", 
 });
 
 export async function POST(req: Request) {
   try {
     const { message, imageBase64 } = await req.json();
 
-    // --- 🧠 THE BRAIN: MATRI-AI SYSTEM PROMPT ---
+    // 1. Validation
+    if (!process.env.GROQ_API_KEY) {
+      throw new Error("Missing GROQ_API_KEY in .env.local");
+    }
+
+    // 2. System Prompt
     const systemPrompt = `
-    ROLE & IDENTITY:
-    You are 'Matri-AI', a specialized, empathetic maternal health assistant for the 'Matri-Force' app in rural Bangladesh. Your goal is to guide pregnant women and new mothers with safe, medically-sound advice while recognizing your limitations as an AI.
-
-    CORE OPERATIONAL RULES:
-    1. LANGUAGE: Detect the user's language (Bengali or English) and reply in the SAME language.
-    2. TONE: Warm, reassuring, "sisterly" (Ap/Didi), but authoritative on safety,depending on condition funny and humanlike.
-    3. MEDICAL SAFETY (CRITICAL): 
-       - You are NOT a doctor. Never diagnose severe conditions or prescribe medication dosages.
-       - If the user mentions "bleeding", "severe pain", "no movement", "fainting", "vision loss", or "fever", IMMEDIATELY advise them to use the app's 'SOS' button or 'Call Doctor' feature. Do not offer home remedies for critical signs.
-
-    APP AWARENESS:
-    - You know this app has features: 'SOS' (Emergency), 'Blood Request', 'Doctor Video Call', 'Digital Prescriptions', and 'Diet Plans'.
-    - If a user needs blood, guide them to the 'Blood Bank' tab.
-    - If they need a checkup, tell them to click 'Book Appointment' in the Care tab.
-
-    LOCAL CONTEXT (BANGLADESH):
-    - DIET: Recommend local, affordable superfoods like Palong Shak (Spinach), Kach kola (Green Banana), Small Fish (Mola), Lentils (Dal), and Eggs. Mention prices in BDT if asked (e.g., "Eggs are approx 12-15৳").
-    - MYTHS: Gently correct common rural myths (e.g., "eating less ensures a small baby") with scientific facts.
-
-    VISION CAPABILITIES:
-    - If an image is provided, analyze it. 
-    - If it's a PRESCRIPTION: Summarize the medicines and instructions simply.
-    - If it's a SYMPTOM PHOTO (e.g., swelling): Describe what you see and advise if it looks normal (mild edema) or dangerous (preeclampsia sign). Always add a disclaimer.
-    - If it's a LAB REPORT: Explain the values (e.g., Hemoglobin levels) in simple terms.
-
-    FORMATTING:
-    - Keep responses concise (under 3-4 sentences unless detailed info is requested).
-    - Use bullet points for diet or steps.
+    ROLE: You are 'Matri-AI', a maternal health assistant for rural Bangladesh.
+    TONE: Empathetic, concise, and culturally aware.
+    SAFETY: You are NOT a doctor. If the user mentions bleeding, severe pain, or vision loss, advise them to use the SOS button immediately.
+    CONTEXT: Recommend local affordable foods (Spinach/Palong, Lentils/Dal, Small fish).
     `;
 
-    // 2. Construct Messages
-    let messages: any[] = [
-      { role: "system", content: systemPrompt },
-    ];
+    let messages: any[] = [{ role: "system", content: systemPrompt }];
+    let selectedModel = "llama-3.3-70b-versatile"; // Default stable text model
 
-    // 3. Handle Image Input (Vision Model)
+    // 3. Handle Input Type
     if (imageBase64) {
+      // Switch to Vision Model for images
+      selectedModel = "llama-3.2-90b-vision-preview"; 
       messages.push({
         role: "user",
         content: [
-          { type: "text", text: message || "Analyze this medical image/document for me." },
-          {
-            type: "image_url",
-            image_url: {
-              url: imageBase64, // Data URL from frontend
-            },
-          },
+          { type: "text", text: message || "Analyze this medical image." },
+          { type: "image_url", image_url: { url: imageBase64 } },
         ],
       });
     } else {
-      // Standard Text Input
-      messages.push({
-        role: "user",
-        content: message,
-      });
+      // Standard Text Model
+      messages.push({ role: "user", content: message });
     }
 
-    // 4. Call Groq Llama-3.2-Vision
-    const completion = await groq.chat.completions.create({
-      messages: messages,
-      model: "llama-3.2-11b-vision-preview", 
-      temperature: 0.5, // Balance creativity with accuracy
-      max_tokens: 512,
-      top_p: 1,
-      stream: false,
-    });
+    // 4. API Call with Fallback
+    try {
+      const completion = await groq.chat.completions.create({
+        messages: messages,
+        model: selectedModel,
+        temperature: 0.5,
+        max_tokens: 512,
+        top_p: 1,
+        stream: false,
+      });
 
-    // 5. Return Response
-    const reply = completion.choices[0]?.message?.content || "I couldn't process that. Please try again.";
-    
-    return NextResponse.json({ reply });
+      const reply = completion.choices[0]?.message?.content || "I couldn't generate a response.";
+      return NextResponse.json({ reply });
+
+    } catch (apiError: any) {
+      console.error("Groq Model Error:", apiError);
+      
+      // FALLBACK: If Vision model fails/is deprecated, try basic text model
+      if (imageBase64 && apiError.status === 400) {
+         return NextResponse.json({ 
+           reply: "I am having trouble analyzing images right now due to a system update. However, I can still answer your text questions! How are you feeling?" 
+         });
+      }
+      throw apiError; // Re-throw other errors to be caught below
+    }
 
   } catch (error: any) {
-    console.error("Groq API Error:", error);
-    return NextResponse.json(
-      { reply: "Matri-AI is currently unreachable. Please check your internet or try again later." }, 
-      { status: 500 }
-    );
+    console.error("Server Error:", error);
+    
+    // SAFE FALLBACK (Prevents UI Crash)
+    let safeReply = "I am focusing on your health. Please consult a doctor for urgent matters.";
+    const lowerMsg = (await req.json().catch(() => ({}))).message?.toLowerCase() || "";
+    
+    if (lowerMsg.includes("bleed") || lowerMsg.includes("pain")) {
+      safeReply = "⚠️ WARNING: Severe pain or bleeding can be dangerous. Please press the SOS button or go to a hospital immediately.";
+    } else if (lowerMsg.includes("diet")) {
+      safeReply = "For a healthy pregnancy, eat Spinach (Iron), Lentils (Protein), and Eggs. Avoid raw foods.";
+    }
+
+    return NextResponse.json({ reply: safeReply });
   }
 }

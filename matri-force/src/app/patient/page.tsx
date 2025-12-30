@@ -760,7 +760,7 @@ function WellnessTab({ user, darkMode, stage, lang }: { user: any; darkMode: boo
   const fetchAIDiet = async () => {
     setLoading(true);
     try {
-      const prompt = "Suggest 3 highly nutritious, affordable food items for a pregnant woman in Bangladesh based on current seasonal availability. Include estimated market price in BDT. Return a raw JSON array with keys: 'name', 'price', 'benefit'. Do not include markdown formatting.";
+      const prompt = "Suggest 10 highly nutritious, affordable food items for a pregnant woman in Bangladesh based on current seasonal availability. Include estimated market price in BDT. Return a raw JSON array with keys: 'name', 'price', 'benefit'. Do not include markdown formatting.";
       const res = await fetch("/api/chat", { method: "POST", body: JSON.stringify({ message: prompt }) });
       const data = await res.json();
       const jsonMatch = data.reply.match(/\[[\s\S]*\]/);
