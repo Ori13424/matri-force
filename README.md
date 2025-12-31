@@ -106,8 +106,10 @@ Open [http://localhost:3000](https://www.google.com/search?q=http://localhost:30
 
 ---
 
-or Run directly through Vercel
+Or Run directly through Vercel
 
+Open [https://matri-bandhob-git-main-fayem-muktadir-rahmans-projects.vercel.app?_vercel_share=jVvMVWUqrd7mrkFsFRzqzniATgBNdD7S] in your browser.
+<img width="320" height="326" alt="image" src="https://github.com/user-attachments/assets/c5ce2a20-3421-4c38-90bf-1428d4b9b28c" />
 
 
 ## 🔐 Role-Based Access Guide
