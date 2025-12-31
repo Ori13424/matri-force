@@ -32,7 +32,7 @@ export default function LandingPage() {
           <div className="h-8 w-8 bg-gradient-to-br from-rose-500 to-orange-500 rounded-lg flex items-center justify-center shadow-lg shadow-rose-500/20">
             <Heart size={18} className="text-white fill-white" />
           </div>
-          <span className="font-bold text-xl tracking-tight text-white">Matri-Force</span>
+          <span className="font-bold text-xl tracking-tight text-white">Matri-Bandhob</span>
         </div>
         <div className="flex items-center gap-4 text-xs font-bold uppercase tracking-widest text-slate-500">
           <span className="hidden md:flex items-center gap-1"><ShieldCheck size={14} className="text-emerald-500"/> Secure</span>
@@ -110,7 +110,7 @@ export default function LandingPage() {
 
       {/* Footer Info */}
       <footer className="relative z-10 w-full p-6 text-center text-slate-600 text-xs">
-        <p>&copy; 2025 Matri-Force Initiative. AI-Powered Healthcare.</p>
+        <p>&copy; 2025 Matri-Bandhob Initiative. AI-Powered Healthcare.</p>
       </footer>
 
     </div>

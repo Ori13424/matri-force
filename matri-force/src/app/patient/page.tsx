@@ -42,7 +42,7 @@ type Lang = "en" | "bn";
 const t = {
   en: {
     welcome_back: "Welcome Back",
-    join_matri: "Join Matri-Force",
+    join_matri: "Join Matri-Bandhob",
     sign_in: "Sign In",
     create_acc: "Create Account",
     full_name: "Full Name",
@@ -376,7 +376,7 @@ export default function PatientApp() {
 
   const toggleLang = () => setLang(lang === "en" ? "bn" : "en");
 
-  if (loading) return <div className="h-screen flex items-center justify-center bg-white text-rose-500 font-bold animate-pulse">Loading Matri-Force...</div>;
+  if (loading) return <div className="h-screen flex items-center justify-center bg-white text-rose-500 font-bold animate-pulse">Loading Matri-Bandhob OS...</div>;
 
   if (!user) return <AuthScreen darkMode={darkMode} lang={lang} toggleLang={toggleLang} />;
 
